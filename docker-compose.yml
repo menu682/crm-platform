@@ -1,0 +1,59 @@
+
+services:
+
+  db:
+    container_name: postgres-crm
+    image: postgres:17.5
+    restart: always
+    environment:
+      - POSTGRES_USER=root
+      - POSTGRES_PASSWORD=root
+      - POSTGRES_DB=crm
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-crm-data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U root -d crm" ]
+      interval: 10s
+      timeout: 5s
+      retries: 100
+
+  config-server:
+    container_name: config-server
+    build:
+      context: ./config-server
+      dockerfile: Dockerfile
+    ports:
+      - "8888:8888"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://config-server:8888/actuator/health" ]
+      interval: 10s
+      timeout: 5s
+      retries: 100
+      start_period: 15s
+
+  eureka-server:
+    container_name: eureka-server
+    build:
+      context: ./eureka-server
+      dockerfile: Dockerfile
+    ports:
+      - "8761:8761"
+    depends_on:
+      config-server:
+        condition: service_healthy
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://eureka-server:8761/actuator/health" ]
+      interval: 10s
+      timeout: 5s
+      retries: 100
+      start_period: 20s
+
+
+volumes:
+  postgres-crm-data:
+    name: postgres-crm-data
